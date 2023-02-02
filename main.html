@@ -3,17 +3,28 @@
 <head>
     <meta charset="utf-8" />
     <title>Canvas tutorial</title>
-    <script src="main.js"></script>
-    <script defer>
-        new World("tutorial");
-    </script>
     <style>
+        div {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
         canvas {
             border: 1px solid black;
         }
     </style>
 </head>
 <body>
-<canvas id="tutorial" width="150" height="150"></canvas>
+<div>
+    <canvas id="tutorial" width="500" height="500"></canvas>
+</div>
+<script type="module">
+    import { World } from "./main.js";
+    import { Rect } from "./shape.js";
+
+    let world = new World("tutorial");
+    world.add(new Rect(100, 100, 50, 50));
+    world.run();
+</script>
 </body>
 </html>

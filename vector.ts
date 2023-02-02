@@ -1,38 +1,51 @@
 export class Vector {
-    private x;
-    private y;
+    private _x;
+    private _y;
 
     constructor(x, y) {
-        this.x = x;
-        this.y = y;
+        this._x = x;
+        this._y = y;
+    }
+
+    static tripleProduct(a: Vector, b: Vector, c: Vector): Vector {
+        const dot = a._x * b._y - b._x * a._y;
+        return new Vector(-c._y * dot, c._x * dot)
+    }
+
+    get x() {
+        return this._x;
+    }
+
+    get y() {
+        return this._y;
     }
 
     clone(): Vector {
-        return new Vector(this.x, this.y);
+        return new Vector(this._x, this._y);
     }
 
     negate(): Vector {
-        return new Vector(-this.x, -this.y);
+        return new Vector(-this._x, -this._y);
     }
 
     subtract(other: Vector): Vector {
-        return new Vector(this.x - other.x, this.y - other.y);
+        return new Vector(this._x - other._x, this._y - other._y);
     }
 
-    perpendicular(): Vector {
-        return new Vector(this.y, -this.x);
+    magnitudeSquared(): number {
+        return this._x * this._x + this._y * this._y;
     }
 
     dot(other: Vector): number {
-        return this.x * other.x + this.y * other.y;
+        return this._x * other._x + this._y * other._y;
     }
 
     apply(other: Vector): void {
-        this.x = other.x;
-        this.y = other.y;
+        this._x = other._x;
+        this._y = other._y;
     }
 
-    sameDirection(other: Vector): boolean {
-        return this.dot(other) > 0;
+    isNotSameDirection(other: Vector): boolean {
+        return this.dot(other) <= 0.0;
     }
 }

@@ -1,5 +1,5 @@
-import { Vector } from "./vector";
-import { Shape } from "./shape";
+import { Vector } from "./vector.js";
+import { Shape } from "./shape.js";
 
 export class GJK {
 
@@ -7,36 +7,41 @@ export class GJK {
         const vectors1 = shape1.getVectors();
         const vectors2 = shape2.getVectors();
 
-        let direction = new Vector(1, 0);
+        const direction = new Vector(1, 0);
 
         const simplex: Vector[] = [];
         simplex.push(this.support(vectors1, vectors2, direction));
 
-        direction = simplex[0].negate();
+        if (simplex[0].isNotSameDirection(direction)) {
+            return false;
+        }
 
-        while (true) {
+        direction.apply(direction.negate());
+
+        for (let i = 0; i < 30; i++) {
             simplex.push(this.support(vectors1, vectors2, direction));
-            if (simplex[simplex.length - 1].dot(direction) <= 0) {
+            if (simplex[simplex.length - 1].isNotSameDirection(direction)) {
                 return false;
-            }
-
-            if (this.checkSimplex(simplex, direction)) {
-                return true;
+            } else {
+                if (this.checkSimplex(simplex, direction)) {
+                    return true;
+                }
             }
         }
+        return false;
     }
 
-    static support(shape1: Vector[], shape2: Vector[], d: Vector): Vector {
-        const f1 = this.furthestPoint(shape1, d);
-        const f2 = this.furthestPoint(shape2, d.negate());
+    private static support(shape1: Vector[], shape2: Vector[], direction: Vector): Vector {
+        const f1 = this.furthestPoint(shape1, direction);
+        const f2 = this.furthestPoint(shape2, direction.negate());
         return f1.subtract(f2);
     }
 
-    static furthestPoint(shape: Vector[], d: Vector): Vector {
-        let max = shape[0].dot(d);
-        let index = 0
+    private static furthestPoint(shape: Vector[], d: Vector): Vector {
+        let max = Number.MIN_VALUE;
+        let index = 0;
 
-        for (let i = 1; i < shape.length; i++) {
+        for (let i = 0; i < shape.length; i++) {
             const dot = shape[i].dot(d);
             if (dot > max) {
                 max = dot;
@@ -46,7 +51,7 @@ export class GJK {
         return shape[index];
     }
 
-    static checkSimplex(simplex: Vector[], direction: Vector): boolean {
+    private static checkSimplex(simplex: Vector[], direction: Vector): boolean {
         if (simplex.length == 2) {
             const a = simplex[1];
             const b = simplex[0];
@@ -54,8 +59,9 @@ export class GJK {
             const ao = a.negate();
             const ab = b.subtract(a);
 
-            direction.apply(ab.perpendicular());
-            if (!direction.sameDirection(ao)) {
+            direction.apply(Vector.tripleProduct(ab, ao, ab));
+
+            if (direction.magnitudeSquared() <= 0.0001) {
                 direction.apply(direction.negate());
             }
             return false;
@@ -68,27 +74,25 @@ export class GJK {
             const ab = b.subtract(a);
             const ac = c.subtract(a);
 
-            direction.apply(ab.perpendicular());
-            if (direction.sameDirection(c)) {
-                direction.apply(direction.negate());
-            }
+            const acPerp = Vector.tripleProduct(ab, ac, ac);
+            const acLocation = acPerp.dot(ao);
 
-            if (direction.sameDirection(ao)) {
-                simplex.splice(0, 1);
-                return false;
-            }
-
-            direction.apply(ac.perpendicular());
-            if (direction.sameDirection(b)) {
-                direction.apply(direction.negate());
-            }
-
-            if (direction.sameDirection(ao)) {
+            if (acLocation >= 0.0) {
                 simplex.splice(1, 1);
-                return false;
-            }
+                direction.apply(acPerp);
+            } else {
+                const abPerp = Vector.tripleProduct(ac, ab, ab);
+                const abLocation = abPerp.dot(ao);
 
-            return true;
+                if (abLocation < 0.0) {
+                    return true;
+                } else {
+                    simplex.splice(0, 1);
+                    direction.apply(abPerp);
+                }
+            }
+        } else {
+            return false;
         }
     }
 }
