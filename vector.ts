@@ -48,4 +48,17 @@ export class Vector {
     isNotSameDirection(other: Vector): boolean {
         return this.dot(other) <= 0.0;
     }
+
+    left(): Vector {
+        return new Vector(this._y, -this._x);
+    }
+
+    norm(): Vector {
+        const magnitude = Math.sqrt(this._x * this._x + this._y * this._y);
+        if (magnitude <= 0.0001) {
+            return this.clone();
+        }
+        const m = 1.0 / magnitude;
+        return new Vector(this._x * m, this._y * m);
+    }
 }

@@ -2,10 +2,14 @@ import { Rect } from "./shape.js";
 import { GJK } from "./gjk.js";
 var World = /** @class */ (function () {
     function World(canvasElementId) {
+        var _this = this;
         this.canvas = document.getElementById(canvasElementId);
         this.context = this.canvas.getContext("2d");
         this.gravity = 1;
         this.shapes = [];
+        this.canvas.addEventListener("click", function (e) {
+            _this.test();
+        });
         var mr = new Rect(120, 120, 50, 50);
         this.canvas.addEventListener("mousemove", function (e) {
             mr.posX = e.offsetX;
@@ -18,9 +22,20 @@ var World = /** @class */ (function () {
         this.shapes.push(shape);
     };
     World.prototype.test = function () {
-        console.log(this.shapes[0].getVectors());
-        console.log(this.shapes[1].getVectors());
-        console.log(GJK.intersect(this.shapes[0], this.shapes[1]));
+        this.context.transform(1, 0, 0, -1, 0, this.canvas.height);
+        var s1 = new Rect(100, 100, 50, 50);
+        s1.color = "red";
+        // 1 x
+        var s2 = new Rect(130, 100, 50, 50);
+        // 2 o
+        // const s2 = new Rect(70, 130, 50, 50);
+        // 3 x
+        // const s2 = new Rect(70, 70, 50, 50);
+        // 4 o
+        // const s2 = new Rect(130, 70, 50, 50);
+        s1.draw(this.context);
+        s2.draw(this.context);
+        console.log(GJK.intersect(s1, s2));
     };
     World.prototype.run = function () {
         var _this = this;
@@ -35,13 +50,9 @@ var World = /** @class */ (function () {
     };
     World.prototype.detect = function () {
         for (var i = 0; i < this.shapes.length - 1; i++) {
-            if (GJK.intersect(this.shapes[i], this.shapes[i + 1])) {
-                this.shapes[i].onCollision();
-                this.shapes[i + 1].onCollision();
-            }
-            else {
-                this.shapes[i].onCollision2();
-                this.shapes[i + 1].onCollision2();
+            var vector = GJK.intersect(this.shapes[i], this.shapes[i + 1]);
+            if (vector) {
+                this.shapes[1].onCollision(vector);
             }
         }
     };

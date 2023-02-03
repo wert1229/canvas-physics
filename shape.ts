@@ -3,7 +3,7 @@ import { Vector } from "./vector.js";
 export interface Shape {
     draw(context: CanvasRenderingContext2D): void
     getVectors(): Vector[]
-    onCollision(): void
+    onCollision(vector: Vector): void
     onCollision2(): void
 }
 
@@ -44,8 +44,8 @@ export class Rect implements Shape {
         this.vectorList = [
             new Vector(this._posX, this._posY),
             new Vector(this._posX + this.width, this._posY),
-            new Vector(this._posX + this.width, this._posY + this.height),
-            new Vector(this._posX, this._posY + this.height)
+            new Vector(this._posX + this.width, this._posY - this.height),
+            new Vector(this._posX, this._posY - this.height)
         ];
     }
 
@@ -64,8 +64,11 @@ export class Rect implements Shape {
         context.fill();
     }
 
-    onCollision() {
+    onCollision(vector: Vector) {
         this._color = "red";
+        this._posX += vector.x;
+        this._posY += vector.y;
+        this.updateVector();
     }
 
     onCollision2() {

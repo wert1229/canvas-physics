@@ -14,6 +14,10 @@ export class World {
         this.gravity = 1;
         this.shapes = [];
 
+        this.canvas.addEventListener("click", e => {
+            this.test();
+        });
+
         const mr = new Rect(120, 120, 50, 50)
         this.canvas.addEventListener("mousemove", e => {
             mr.posX = e.offsetX;
@@ -28,9 +32,21 @@ export class World {
     }
 
     test() {
-        console.log(this.shapes[0].getVectors());
-        console.log(this.shapes[1].getVectors());
-        console.log(GJK.intersect(this.shapes[0], this.shapes[1]));
+        this.context.transform(1, 0, 0, -1, 0, this.canvas.height);
+        const s1 = new Rect(100, 100, 50, 50);
+        s1.color = "red";
+        // 1 x
+        const s2 = new Rect(130, 100, 50, 50);
+        // 2 o
+        // const s2 = new Rect(70, 130, 50, 50);
+        // 3 x
+        // const s2 = new Rect(70, 70, 50, 50);
+        // 4 o
+        // const s2 = new Rect(130, 70, 50, 50);
+
+        s1.draw(this.context);
+        s2.draw(this.context);
+        console.log(GJK.intersect(s1, s2));
     }
 
     run() {
@@ -46,12 +62,9 @@ export class World {
 
     detect() {
         for (let i = 0; i < this.shapes.length - 1; i++) {
-            if (GJK.intersect(this.shapes[i], this.shapes[i + 1])) {
-                this.shapes[i].onCollision();
-                this.shapes[i + 1].onCollision();
-            } else {
-                this.shapes[i].onCollision2();
-                this.shapes[i + 1].onCollision2();
+            const vector = GJK.intersect(this.shapes[i], this.shapes[i + 1]);
+            if (vector) {
+                this.shapes[1].onCollision(vector);
             }
         }
     }
