@@ -88,39 +88,49 @@ export class GJK {
     }
 
     static epa(simplex: Vector[], shape1: Shape, shape2: Shape): Vector {
+        let edge;
+        let supportDistance;
+        for (let i = 0; i < 100; i++) {
+            edge = this.closestEdge(simplex);
+
+            let support = this.support(shape1.getVectors(), shape2.getVectors(), edge.normal);
+            supportDistance = support.dot(edge.normal);
+
+            if (supportDistance - edge.distance < 0.0000001) {
+                return new Vector(edge.normal.x * edge.distance, edge.normal.y * edge.distance);
+            }
+            simplex.splice(edge.index, 0, support);
+        }
+
+        return new Vector(edge.normal.x * supportDistance, edge.normal.y * supportDistance);
+    }
+
+    static closestEdge(simplex): { distance: number, normal: Vector, index: number }  {
         let minIndex = 0;
         let minDistance = Number.POSITIVE_INFINITY;
         let minNormal;
+        for (let a = 0; a < simplex.length; a++) {
+            let b = (a + 1) % simplex.length;
+            let ab = simplex[b].subtract(simplex[a]);
 
-        while (minDistance == Number.POSITIVE_INFINITY) {
-            for (let i = 0; i < simplex.length; i++) {
-                let j = (i + 1) % simplex.length;
-                let ij = simplex[j].subtract(simplex[i]);
+            let normal = Vector.tripleProduct(ab, simplex[a], ab).norm();
+            let distance = normal.dot(simplex[a]);
 
-                let normal = Vector.tripleProduct(ij, simplex[i], ij).norm();
-                let distance = normal.dot(simplex[i]);
-
-                if (distance < 0) {
-                    // distance *= -1;
-                    normal.apply(normal.negate());
-                }
-
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    minNormal = normal;
-                    minIndex = j;
-                }
+            if (distance < 0) {
+                distance *= -1;
+                normal.apply(normal.negate());
             }
 
-            let support = this.support(shape1.getVectors(), shape2.getVectors(), minNormal);
-            let supportDistance = support.dot(minNormal);
-
-            if (supportDistance - minDistance < 0.0001) {
-                minDistance = Number.POSITIVE_INFINITY;
-                simplex.splice(minIndex, 0, support);
+            if (distance < minDistance) {
+                minDistance = distance;
+                minNormal = normal;
+                minIndex = b;
             }
         }
-
-        return new Vector(minNormal.x * (minDistance + 0.0001), minNormal.y * (minDistance + 0.0001));
+        return {
+            distance: minDistance,
+            normal: minNormal,
+            index: minIndex
+        };
     }
 }

@@ -3,8 +3,8 @@ import { Vector } from "./vector.js";
 export interface Shape {
     draw(context: CanvasRenderingContext2D): void
     getVectors(): Vector[]
-    onCollision(vector: Vector): void
-    onCollision2(): void
+    onCollision(shape:Shape, vector: Vector): void
+    onGravity(gravity: number): void
 }
 
 export class Rect implements Shape {
@@ -14,8 +14,10 @@ export class Rect implements Shape {
     private height: number;
     private _color: string;
 
-    private velX: number;
-    private velY: number;
+    private _velX: number;
+    private _velY: number;
+    private _accX: number;
+    private _accY: number;
 
     private vectorList: Vector[];
 
@@ -24,6 +26,10 @@ export class Rect implements Shape {
         this._posY = posY;
         this.width = width;
         this.height = height;
+        this._velX = 0;
+        this._velY = 0;
+        this._accX = 0;
+        this._accY = 0;
 
         this.updateVector();
     }
@@ -64,14 +70,31 @@ export class Rect implements Shape {
         context.fill();
     }
 
-    onCollision(vector: Vector) {
+    onCollision(shape:Shape, vector: Vector) {
+        console.log(shape);
         this._color = "red";
-        this._posX += vector.x;
-        this._posY += vector.y;
+        this._velY = -this._velY
         this.updateVector();
     }
 
-    onCollision2() {
-        this._color = "green";
+    onGravity(gravity: number) {
+        this._accY = gravity;
+        this._velY += this._accY;
+        this._posY += this._velY;
+        this.updateVector();
+    }
+}
+
+export class Earth extends Rect {
+    constructor(posX: number, posY: number, width: number, height: number) {
+        super(posX, posY, width, height);
+    }
+
+    onCollision(shape:Shape, vector: Vector) {
+
+    }
+
+    onGravity(gravity: number) {
+
     }
 }
