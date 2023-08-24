@@ -1,4 +1,4 @@
-import { Vector } from "./vector.js";
+import { Vector } from "./vector";
 
 export interface Shape {
     draw(context: CanvasRenderingContext2D): void

@@ -1,39 +1,42 @@
-import { Vector } from "./vector.js";
-import { Shape } from "./shape.js";
+import {Vector} from "../geometry/vector.js";
+import {Body} from "../physics/body.js";
+import {CollisionDetector, CollisionData, Penetration} from "./collision.js";
+import {Epsilon} from "../epsilon.js";
 
-export class GJK {
-
-    static intersect(shape1: Shape, shape2: Shape): Vector {
-        const vectors1 = shape1.getVectors();
-        const vectors2 = shape2.getVectors();
-
+export class Gjk implements CollisionDetector {
+    detect(bodyA: Body, bodyB: Body): CollisionData {
         const direction = new Vector(1, 0);
 
         const simplex: Vector[] = [];
-        simplex.push(this.support(vectors1, vectors2, direction));
+        simplex.push(this.support(bodyA, bodyB, direction));
 
         direction.apply(simplex[0].negate());
 
         for (let i = 0; i < 30; i++) {
-            const support = this.support(vectors1, vectors2, direction);
+            const support = this.support(bodyA, bodyB, direction);
             if (support.isNotSameDirection(direction)) {
                 return null;
             }
             simplex.push(support);
             if (this.checkSimplex(simplex, direction)) {
-                return this.epa(simplex, shape1, shape2);
+                const penetration = this.epa(simplex, bodyA, bodyB);
+                return {
+                    bodyA: bodyA,
+                    bodyB: bodyB,
+                    penetration: penetration
+                };
             }
         }
         return null;
     }
 
-    private static support(shape1: Vector[], shape2: Vector[], direction: Vector): Vector {
-        const f1 = this.furthestPoint(shape1, direction);
-        const f2 = this.furthestPoint(shape2, direction.negate());
+    private support(bodyA: Body, bodyB: Body, direction: Vector): Vector {
+        const f1 = bodyA.furthestPoint(direction);
+        const f2 = bodyB.furthestPoint(direction.negate());
         return f1.subtract(f2);
     }
 
-    private static furthestPoint(shape: Vector[], d: Vector): Vector {
+    private furthestPoint(shape: Vector[], d: Vector): Vector {
         let max = Number.NEGATIVE_INFINITY;
         let index = 0;
 
@@ -47,7 +50,7 @@ export class GJK {
         return shape[index];
     }
 
-    private static checkSimplex(simplex: Vector[], direction: Vector): boolean {
+    private checkSimplex(simplex: Vector[], direction: Vector): boolean {
         if (simplex.length == 2) {
             const a = simplex[1];
             const b = simplex[0];
@@ -56,7 +59,7 @@ export class GJK {
             const ab = b.subtract(a);
 
             direction.apply(Vector.tripleProduct(ab, ao, ab));
-            if (direction.magnitudeSquared() <= 0.0001) {
+            if (direction.magnitudeSquared() <= Epsilon.E) {
                 direction.apply(ab.left());
             }
             return false;
@@ -87,25 +90,31 @@ export class GJK {
         }
     }
 
-    static epa(simplex: Vector[], shape1: Shape, shape2: Shape): Vector {
+    epa(simplex: Vector[], bodyA: Body, bodyB: Body): Penetration {
         let edge;
         let supportDistance;
         for (let i = 0; i < 100; i++) {
             edge = this.closestEdge(simplex);
 
-            let support = this.support(shape1.getVectors(), shape2.getVectors(), edge.normal);
+            let support = this.support(bodyA, bodyB, edge.normal);
             supportDistance = support.dot(edge.normal);
 
-            if (supportDistance - edge.distance < 0.0000001) {
-                return new Vector(edge.normal.x * edge.distance, edge.normal.y * edge.distance);
+            if (supportDistance - edge.distance < Epsilon.E) {
+                return {
+                    normal: edge.normal,
+                    depth: edge.distance
+                };
             }
             simplex.splice(edge.index, 0, support);
         }
 
-        return new Vector(edge.normal.x * supportDistance, edge.normal.y * supportDistance);
+        return {
+            normal: edge.normal,
+            depth: supportDistance
+        };
     }
 
-    static closestEdge(simplex): { distance: number, normal: Vector, index: number }  {
+    closestEdge(simplex): { distance: number, normal: Vector, index: number }  {
         let minIndex = 0;
         let minDistance = Number.POSITIVE_INFINITY;
         let minNormal;
@@ -113,7 +122,7 @@ export class GJK {
             let b = (a + 1) % simplex.length;
             let ab = simplex[b].subtract(simplex[a]);
 
-            let normal = Vector.tripleProduct(ab, simplex[a], ab).norm();
+            let normal = Vector.tripleProduct(ab, simplex[a], ab).normalize();
             let distance = normal.dot(simplex[a]);
 
             if (distance < 0) {
