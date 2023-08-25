@@ -19,8 +19,8 @@ export class World {
 
     constructor(canvasElementId: string) {
         this.canvas = document.getElementById(canvasElementId) as HTMLCanvasElement;
-        this.context = this.canvas.getContext("2d");
-        this.gravity = new Vector(0, -10.0);
+        this.context = this.canvas.getContext("2d", { alpha: false });
+        this.gravity = new Vector(0, 10.0);
         this.accumulatedTime = 0;
         this.timePerFrame = 1.0 / 60.0;
         this.bodies = [];
@@ -60,11 +60,15 @@ export class World {
 
         this.addAll(boxes);
 
-        const controlledBody = this.bodies[0]
+        this.tempBody = this.bodies[0];
+
         this.canvas.addEventListener("mousemove", e => {
-            controlledBody.moveTo(new Vector(e.offsetX, e.offsetY));
+            this.tempForce = new Vector(e.offsetX, e.offsetY).subtract(this.tempBody.position);
         });
     }
+
+    tempForce: Vector = Vector.zero();
+    tempBody: Body;
 
     add(body: Body): void {
         this.bodies.push(body);
@@ -145,20 +149,38 @@ export class World {
         //     .forEach(body => {
         //         body.rotate(Math.PI / 2.0 * 0.1);
         //     });
-
         for (const collision of this.collisions) {
             collision.bodyA.move(collision.penetration.normal.multiply(collision.penetration.depth / 2.0).negate());
             collision.bodyB.move(collision.penetration.normal.multiply(collision.penetration.depth / 2.0));
+
+            this.resolveCollision(collision);
         }
 
-        // for (let i = 0; i < this.collision.length; i++) {
-        //     for (let j = 0; j < this.collision[i].length; j++) {
-        //         const collisionVector = this.collision[i][j];
-        //         if (collisionVector) {
-        //             this.shapes[i].onCollision(this.shapes[j], collisionVector);
-        //         }
-        //     }
-        // }
+        this.tempBody.applyForce(this.tempForce.multiply(elapsedTime * 10000));
+
+        for (const body of this.bodies) {
+            body.applyForce(this.gravity.multiply(elapsedTime * body.mass));
+            body.integrateVelocity(elapsedTime);
+            body.integratePosition(elapsedTime);
+        }
+    }
+
+    private resolveCollision(collision: CollisionData) {
+        const bodyA = collision.bodyA;
+        const bodyB = collision.bodyB;
+
+        const relativeVelocity = bodyB.linearVelocity.subtract(bodyA.linearVelocity);
+
+        const e = Math.min(bodyA.restitution, bodyB.restitution);
+        const j = -(1.0 + e) * relativeVelocity.dot(collision.penetration.normal) / (1.0 / bodyA.mass + 1.0 / bodyB.mass);
+
+        const impulse = collision.penetration.normal.multiply(j);
+
+        bodyA.applyForce(impulse.negate());
+        bodyB.applyForce(impulse);
+
+        // bodyA.linearVelocity = bodyA.linearVelocity.subtract(impulse.multiply(1.0 / bodyA.mass));
+        // bodyB.linearVelocity = bodyB.linearVelocity.add(impulse.multiply(1.0 / bodyB.mass));
     }
 
     apply() {

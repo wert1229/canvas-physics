@@ -6,16 +6,18 @@ export class Body {
     static DEFAULT_RESTITUTION: number = 0.5;
 
     position: Vector;
-    private linearVelocity: Vector;
+    linearVelocity: Vector;
     private rotation: number;
     private angularVelocity: number;
 
-    private density: number;
-    private mass: number;
-    private area: number;
-    private restitution: number;
+    private force: Vector;
 
-    private isStatic: boolean;
+    private density: number;
+    mass: number;
+    private area: number;
+    restitution: number;
+
+    isStatic: boolean;
 
     radius: number;
     width: number;
@@ -44,6 +46,7 @@ export class Body {
         this.linearVelocity = linearVelocity;
         this.rotation = rotation;
         this.angularVelocity = angularVelocity;
+        this.force = Vector.zero();
         this.density = density;
         this.mass = mass;
         this.area = area;
@@ -148,5 +151,30 @@ export class Body {
             }
             return this.transformedVertices[index];
         }
+    }
+
+    applyForce(force: Vector): void {
+        this.force = this.force.add(force);
+    }
+
+    integrateVelocity(elapsedTime: number): void {
+        if (this.isStatic) {
+            return;
+        }
+        const acceleration = this.force.multiply(1.0 / this.mass);
+        this.linearVelocity = this.linearVelocity.add(acceleration.multiply(elapsedTime));
+        // this.angularVelocity += this.torque * elapsedTime / this.mass;
+
+        this.force = Vector.zero();
+    }
+
+    integratePosition(elapsedTime: number): void {
+        if (this.isStatic) {
+            return;
+        }
+
+        this.position = this.position.add(this.linearVelocity.multiply(elapsedTime));
+        this.rotation = this.rotation + this.angularVelocity * elapsedTime;
+        this.transformVertices();
     }
 }
