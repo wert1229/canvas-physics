@@ -2,7 +2,7 @@ import {Vector} from "../geometry/vector.js";
 import {Transform} from "../geometry/transform.js";
 
 export class Body {
-    static DEFAULT_DENSITY: number = 0.5;
+    static DEFAULT_DENSITY: number = 1.0;
     static DEFAULT_RESTITUTION: number = 0.5;
 
     position: Vector;
@@ -14,6 +14,7 @@ export class Body {
 
     private density: number;
     mass: number;
+    invMass: number;
     private area: number;
     restitution: number;
 
@@ -34,6 +35,7 @@ export class Body {
                         angularVelocity: number,
                         density: number,
                         mass: number,
+                        invMass: number,
                         area: number,
                         restitution: number,
                         isStatic: boolean,
@@ -49,6 +51,7 @@ export class Body {
         this.force = Vector.zero();
         this.density = density;
         this.mass = mass;
+        this.invMass = invMass;
         this.area = area;
         this.restitution = restitution;
         this.isStatic = isStatic;
@@ -66,13 +69,15 @@ export class Body {
                         isStatic: boolean): Body {
         const density = Body.DEFAULT_DENSITY;
         const area = Math.PI * radius * radius;
+        const mass = area * density;
         return new Body(
             position,
             Vector.zero(),
             0.0,
             0.0,
             density,
-            area * density,
+            mass,
+            isStatic ? 0 : 1.0 / mass,
             area,
             Body.DEFAULT_RESTITUTION,
             isStatic,
@@ -89,7 +94,8 @@ export class Body {
                      height: number,
                      isStatic: boolean): Body {
         const density = Body.DEFAULT_DENSITY;
-        const area = width * height
+        const area = width * height;
+        const mass = area * density;
         const vertices = [
             new Vector(-width / 2, -height / 2),
             new Vector(width / 2, -height / 2),
@@ -103,7 +109,8 @@ export class Body {
             0.0,
             0.0,
             density,
-            area * density,
+            mass,
+            isStatic ? 0 : 1.0 / mass,
             area,
             Body.DEFAULT_RESTITUTION,
             isStatic,
@@ -161,7 +168,8 @@ export class Body {
         if (this.isStatic) {
             return;
         }
-        const acceleration = this.force.multiply(1.0 / this.mass);
+
+        const acceleration = this.force.multiply(this.invMass);
         this.linearVelocity = this.linearVelocity.add(acceleration.multiply(elapsedTime));
         // this.angularVelocity += this.torque * elapsedTime / this.mass;
 

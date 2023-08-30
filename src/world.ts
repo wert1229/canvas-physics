@@ -19,8 +19,9 @@ export class World {
 
     constructor(canvasElementId: string) {
         this.canvas = document.getElementById(canvasElementId) as HTMLCanvasElement;
-        this.context = this.canvas.getContext("2d", { alpha: false });
-        this.gravity = new Vector(0, 10.0);
+        this.context = this.canvas.getContext("2d");
+        this.context.setTransform(1,0,0,-1,0, this.canvas.height);
+        this.gravity = new Vector(0, -300.0);
         this.accumulatedTime = 0;
         this.timePerFrame = 1.0 / 60.0;
         this.bodies = [];
@@ -31,40 +32,65 @@ export class World {
     }
 
     initSampleData() {
-        const circles: Body[] = [...new Array(10)]
-            .map(() => {
-                return Body.createCircle(
-                    new Vector(
-                        Math.floor(Math.random() * this.canvas.width - 50) + 50,
-                        Math.floor(Math.random() * this.canvas.height - 50) + 50,
-                    ),
+        // const circles: Body[] = [...new Array(10)]
+        //     .map(() => {
+        //         return Body.createCircle(
+        //             new Vector(
+        //                 Math.floor(Math.random() * this.canvas.width - 50) + 50,
+        //                 Math.floor(Math.random() * this.canvas.height - 50) + 50,
+        //             ),
+        //             Math.floor(Math.random() * 30) + 20,
+        //             false
+        //         );
+        //     });
+        //
+        // this.addAll(circles);
+        //
+        // const boxes: Body[] = [...new Array(10)]
+        //     .map(() => {
+        //         return Body.createBox(
+        //             new Vector(
+        //                 Math.floor(Math.random() * this.canvas.width - 50) + 50,
+        //                 Math.floor(Math.random() * this.canvas.height - 50) + 50,
+        //             ),
+        //             Math.floor(Math.random() * 30) + 20,
+        //             Math.floor(Math.random() * 30) + 20,
+        //             true
+        //         );
+        //     });
+        //
+        // this.addAll(boxes);
+        //
+        // this.tempBody = this.bodies[0];
+        //
+        // this.canvas.addEventListener("mousemove", e => {
+        //     this.tempForce = new Vector(e.offsetX, e.offsetY).subtract(this.tempBody.position);
+        // });
+
+        const earth = Body.createBox(
+            new Vector(this.canvas.width / 2, 25),
+            this.canvas.width,
+            50,
+            true
+        );
+
+        this.add(earth);
+
+        this.canvas.onclick = e => {
+            const body = Math.random() < 0.5
+                ? Body.createCircle(
+                    new Vector(e.offsetX, e.offsetY),
+                    Math.floor(Math.random() * 30) + 20,
+                    false
+                )
+                : Body.createBox(
+                    new Vector(e.offsetX, e.offsetY),
+                    Math.floor(Math.random() * 30) + 20,
                     Math.floor(Math.random() * 30) + 20,
                     false
                 );
-            });
-
-        this.addAll(circles);
-
-        const boxes: Body[] = [...new Array(10)]
-            .map(() => {
-                return Body.createBox(
-                    new Vector(
-                        Math.floor(Math.random() * this.canvas.width - 50) + 50,
-                        Math.floor(Math.random() * this.canvas.height - 50) + 50,
-                    ),
-                    Math.floor(Math.random() * 30) + 20,
-                    Math.floor(Math.random() * 30) + 20,
-                    false
-                );
-            });
-
-        this.addAll(boxes);
-
-        this.tempBody = this.bodies[0];
-
-        this.canvas.addEventListener("mousemove", e => {
-            this.tempForce = new Vector(e.offsetX, e.offsetY).subtract(this.tempBody.position);
-        });
+            this.add(body);
+        }
     }
 
     tempForce: Vector = Vector.zero();
@@ -93,15 +119,16 @@ export class World {
         this.accumulatedTime += elapsedTime;
         if (this.accumulatedTime >= this.timePerFrame) {
             this.accumulatedTime -= this.timePerFrame;
-            this.step(elapsedTime);
+            this.step(elapsedTime, 20);
         }
     }
 
-    step(elapsedTime: number) {
+    step(elapsedTime: number, iteration: number) {
         this.clear();
-        this.detect();
-        this.solve(elapsedTime);
-        this.apply();
+        for (let i = 0; i < iteration; i++) {
+            this.detect();
+            this.solve(elapsedTime / iteration);
+        }
         this.draw();
     }
 
@@ -133,6 +160,10 @@ export class World {
                 const bodyA = this.bodies[i];
                 const bodyB = this.bodies[j];
 
+                if (bodyA.isStatic && bodyB.isStatic) {
+                    continue;
+                }
+
                 const collision = this.collisionDetector.detect(bodyA, bodyB);
                 if (!collision) {
                     continue;
@@ -150,16 +181,22 @@ export class World {
         //         body.rotate(Math.PI / 2.0 * 0.1);
         //     });
         for (const collision of this.collisions) {
-            collision.bodyA.move(collision.penetration.normal.multiply(collision.penetration.depth / 2.0).negate());
-            collision.bodyB.move(collision.penetration.normal.multiply(collision.penetration.depth / 2.0));
+            if (collision.bodyA.isStatic) {
+                collision.bodyB.move(collision.penetration.normal.multiply(collision.penetration.depth));
+            } else if (collision.bodyB.isStatic) {
+                collision.bodyA.move(collision.penetration.normal.multiply(collision.penetration.depth).negate());
+            } else {
+                collision.bodyA.move(collision.penetration.normal.multiply(collision.penetration.depth / 2.0).negate());
+                collision.bodyB.move(collision.penetration.normal.multiply(collision.penetration.depth / 2.0));
+            }
 
             this.resolveCollision(collision);
         }
 
-        this.tempBody.applyForce(this.tempForce.multiply(elapsedTime * 10000));
+        // this.tempBody.applyForce(this.tempForce.multiply(elapsedTime * this.tempBody.mass * 10));
 
         for (const body of this.bodies) {
-            body.applyForce(this.gravity.multiply(elapsedTime * body.mass));
+            body.applyForce(this.gravity.multiply(body.mass));
             body.integrateVelocity(elapsedTime);
             body.integratePosition(elapsedTime);
         }
@@ -171,20 +208,20 @@ export class World {
 
         const relativeVelocity = bodyB.linearVelocity.subtract(bodyA.linearVelocity);
 
+        if (relativeVelocity.dot(collision.penetration.normal) > 0) {
+            return;
+        }
+
         const e = Math.min(bodyA.restitution, bodyB.restitution);
-        const j = -(1.0 + e) * relativeVelocity.dot(collision.penetration.normal) / (1.0 / bodyA.mass + 1.0 / bodyB.mass);
+        const j = -(1.0 + e) * relativeVelocity.dot(collision.penetration.normal) / (bodyA.invMass + bodyB.invMass);
 
         const impulse = collision.penetration.normal.multiply(j);
 
-        bodyA.applyForce(impulse.negate());
-        bodyB.applyForce(impulse);
+        // bodyA.applyForce(impulse.negate());
+        // bodyB.applyForce(impulse);
 
-        // bodyA.linearVelocity = bodyA.linearVelocity.subtract(impulse.multiply(1.0 / bodyA.mass));
-        // bodyB.linearVelocity = bodyB.linearVelocity.add(impulse.multiply(1.0 / bodyB.mass));
-    }
-
-    apply() {
-        // this.shapes.forEach(shape => shape.onGravity(this.gravity));
+        bodyA.linearVelocity = bodyA.linearVelocity.subtract(impulse.multiply(bodyA.invMass));
+        bodyB.linearVelocity = bodyB.linearVelocity.add(impulse.multiply(bodyB.invMass));
     }
 
     draw() {
