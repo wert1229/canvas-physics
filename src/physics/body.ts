@@ -1,5 +1,6 @@
 import {Vector} from "../geometry/vector.js";
 import {Transform} from "../geometry/transform.js";
+import {Aabb} from "../geometry/aabb.js";
 
 export class Body {
     static DEFAULT_DENSITY: number = 1.0;
@@ -28,6 +29,7 @@ export class Body {
 
     readonly vertices: Vector[];
     transformedVertices: Vector[];
+    aabb: Aabb;
 
     private constructor(position: Vector,
                         linearVelocity: Vector,
@@ -62,6 +64,7 @@ export class Body {
         this.vertices = vertices;
         this.transformedVertices = [];
         this.transformVertices();
+        this.aabb = this.getAabb();
     }
 
     static createCircle(position: Vector,
@@ -125,16 +128,19 @@ export class Body {
     move(position: Vector): void {
         this.position = this.position.add(position);
         this.transformVertices();
+        this.aabb = this.getAabb();
     }
 
     moveTo(position: Vector): void {
         this.position = position;
         this.transformVertices();
+        this.aabb = this.getAabb();
     }
 
     rotate(radians: number): void {
         this.rotation += radians;
         this.transformVertices();
+        this.aabb = this.getAabb();
     }
 
     private transformVertices(): void {
@@ -184,5 +190,36 @@ export class Body {
         this.position = this.position.add(this.linearVelocity.multiply(elapsedTime));
         this.rotation = this.rotation + this.angularVelocity * elapsedTime;
         this.transformVertices();
+        this.aabb = this.getAabb();
+    }
+
+    getAabb(): Aabb {
+        if (this.type == 0) {
+            const min = this.position.subtract(new Vector(this.radius, this.radius));
+            const max = this.position.add(new Vector(this.radius, this.radius));
+            return new Aabb(min, max);
+        } else {
+            let minX = Number.POSITIVE_INFINITY;
+            let minY = Number.POSITIVE_INFINITY;
+            let maxX = Number.NEGATIVE_INFINITY;
+            let maxY = Number.NEGATIVE_INFINITY;
+
+            for (let i = 0; i < this.transformedVertices.length; i++) {
+                const vertex = this.transformedVertices[i];
+                if (vertex.x < minX) {
+                    minX = vertex.x;
+                }
+                if (vertex.x > maxX) {
+                    maxX = vertex.x;
+                }
+                if (vertex.y < minY) {
+                    minY = vertex.y;
+                }
+                if (vertex.y > maxY) {
+                    maxY = vertex.y;
+                }
+            }
+            return new Aabb(new Vector(minX, minY), new Vector(maxX, maxY));
+        }
     }
 }

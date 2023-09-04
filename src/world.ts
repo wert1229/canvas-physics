@@ -17,6 +17,8 @@ export class World {
     private collisions: CollisionData[];
     private collisionDetector: CollisionDetector;
 
+    private stepMs: number = 1000 / 60;
+
     constructor(canvasElementId: string) {
         this.canvas = document.getElementById(canvasElementId) as HTMLCanvasElement;
         this.context = this.canvas.getContext("2d");
@@ -79,12 +81,12 @@ export class World {
         this.canvas.onclick = e => {
             const body = Math.random() < 0.5
                 ? Body.createCircle(
-                    new Vector(e.offsetX, e.offsetY),
+                    new Vector(e.offsetX, this.canvas.height - e.offsetY),
                     Math.floor(Math.random() * 30) + 20,
                     false
                 )
                 : Body.createBox(
-                    new Vector(e.offsetX, e.offsetY),
+                    new Vector(e.offsetX, this.canvas.height - e.offsetY),
                     Math.floor(Math.random() * 30) + 20,
                     Math.floor(Math.random() * 30) + 20,
                     false
@@ -125,10 +127,13 @@ export class World {
 
     step(elapsedTime: number, iteration: number) {
         this.clear();
+        const before = Date.now()
         for (let i = 0; i < iteration; i++) {
             this.detect();
             this.solve(elapsedTime / iteration);
         }
+        this.stepMs = Date.now() - before;
+
         this.draw();
     }
 
@@ -175,11 +180,6 @@ export class World {
     }
 
     solve(elapsedTime: number) {
-        // this.bodies
-        //     .filter(body => body.type == 1)
-        //     .forEach(body => {
-        //         body.rotate(Math.PI / 2.0 * 0.1);
-        //     });
         for (const collision of this.collisions) {
             if (collision.bodyA.isStatic) {
                 collision.bodyB.move(collision.penetration.normal.multiply(collision.penetration.depth));
@@ -225,6 +225,13 @@ export class World {
     }
 
     draw() {
+        this.context.save();
+        this.context.resetTransform();
+        this.context.font = "30px Arial";
+        this.context.fillText(`body count: ${this.bodies.length}`, 50, 500);
+        this.context.fillText(`step time: ${this.stepMs} ms`, 50, 600);
+        this.context.restore();
+
         this.bodies.forEach(body => {
             if (body.type === 0) {
                 this.context.beginPath();
@@ -246,11 +253,20 @@ export class World {
                 this.context.lineTo(transformedVertices[0].x, transformedVertices[0].y);
                 this.context.stroke();
             }
+
+            // const aabb = body.aabb;
+            // this.context.strokeRect(aabb.min.x, aabb.min.y, aabb.max.x - aabb.min.x, aabb.max.y - aabb.min.y);
         });
     }
 
     clear() {
         this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.collisions = [];
+
+        for (let i = 0; i < this.bodies.length; i++) {
+            if (this.bodies[i].aabb.max.y < 0) {
+                this.bodies.splice(i, 1);
+            }
+        }
     }
 }

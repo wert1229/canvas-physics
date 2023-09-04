@@ -15,3 +15,12 @@ export interface Penetration {
     readonly normal: Vector;
     readonly depth: number;
 }
+
+export interface ContactPointSolver {
+
+}
+
+export interface Manifold {
+    readonly contactPoints: Vector[];
+    readonly penetration: Penetration;
+}
