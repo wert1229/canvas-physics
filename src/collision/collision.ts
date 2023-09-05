@@ -17,10 +17,12 @@ export interface Penetration {
 }
 
 export interface ContactPointSolver {
-
+    findContactPoints(bodyA: Body, bodyB: Body, penetration: Penetration): Vector[];
 }
 
 export interface Manifold {
-    readonly contactPoints: Vector[];
+    readonly bodyA: Body;
+    readonly bodyB: Body;
     readonly penetration: Penetration;
+    readonly contactPoints: Vector[];
 }

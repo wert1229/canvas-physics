@@ -16,6 +16,9 @@ export class Body {
     private density: number;
     mass: number;
     invMass: number;
+    inertia: number;
+    invInertia: number;
+
     private area: number;
     restitution: number;
 
@@ -38,6 +41,8 @@ export class Body {
                         density: number,
                         mass: number,
                         invMass: number,
+                        inertia: number,
+                        invInertia: number,
                         area: number,
                         restitution: number,
                         isStatic: boolean,
@@ -54,6 +59,8 @@ export class Body {
         this.density = density;
         this.mass = mass;
         this.invMass = invMass;
+        this.inertia = inertia;
+        this.invInertia = invInertia;
         this.area = area;
         this.restitution = restitution;
         this.isStatic = isStatic;
@@ -73,6 +80,7 @@ export class Body {
         const density = Body.DEFAULT_DENSITY;
         const area = Math.PI * radius * radius;
         const mass = area * density;
+        const inertia = (1.0 / 12.0) * mass * radius * radius;
         return new Body(
             position,
             Vector.zero(),
@@ -81,6 +89,8 @@ export class Body {
             density,
             mass,
             isStatic ? 0 : 1.0 / mass,
+            inertia,
+            isStatic ? 0 : 1.0 / inertia,
             area,
             Body.DEFAULT_RESTITUTION,
             isStatic,
@@ -99,6 +109,7 @@ export class Body {
         const density = Body.DEFAULT_DENSITY;
         const area = width * height;
         const mass = area * density;
+        const inertia = (1.0 / 12.0) * mass * (width * width + height * height);
         const vertices = [
             new Vector(-width / 2, -height / 2),
             new Vector(width / 2, -height / 2),
@@ -114,6 +125,8 @@ export class Body {
             density,
             mass,
             isStatic ? 0 : 1.0 / mass,
+            inertia,
+            isStatic ? 0 : 1.0 / inertia,
             area,
             Body.DEFAULT_RESTITUTION,
             isStatic,

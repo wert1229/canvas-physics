@@ -1,7 +1,8 @@
 import {Vector} from "./geometry/vector.js";
 import {Body} from "./physics/body.js";
 import {Gjk} from "./collision/gjk.js";
-import {CollisionData, CollisionDetector} from "./collision/collision.js";
+import {CollisionDetector, ContactPointSolver, Manifold} from "./collision/collision.js";
+import {PointLineSegmentSolver} from "./collision/pointlinesegmentsovler.js";
 
 export class World {
     private canvas: HTMLCanvasElement;
@@ -14,8 +15,10 @@ export class World {
 
     private lastTime: number;
     private bodies: Body[];
-    private collisions: CollisionData[];
     private collisionDetector: CollisionDetector;
+
+    private manifolds: Manifold[];
+    private contactPointSolver: ContactPointSolver;
 
     private stepMs: number = 1000 / 60;
 
@@ -27,8 +30,9 @@ export class World {
         this.accumulatedTime = 0;
         this.timePerFrame = 1.0 / 60.0;
         this.bodies = [];
-        this.collisions = [];
+        this.manifolds = [];
         this.collisionDetector = new Gjk();
+        this.contactPointSolver = new PointLineSegmentSolver();
 
         this.initSampleData();
     }
@@ -75,8 +79,16 @@ export class World {
             50,
             true
         );
-
         this.add(earth);
+
+        const platform = Body.createBox(
+            new Vector(300, 500),
+            600,
+            50,
+            true
+        );
+        platform.rotate(- Math.PI / 10);
+        this.add(platform);
 
         this.canvas.onclick = e => {
             const body = Math.random() < 0.5
@@ -174,23 +186,34 @@ export class World {
                     continue;
                 }
 
-                this.collisions.push(collision);
+                const contactPoints = this.contactPointSolver.findContactPoints(
+                    collision.bodyA,
+                    collision.bodyB,
+                    collision.penetration
+                );
+
+                this.manifolds.push({
+                    bodyA: collision.bodyA,
+                    bodyB: collision.bodyB,
+                    penetration: collision.penetration,
+                    contactPoints: contactPoints
+                });
             }
         }
     }
 
     solve(elapsedTime: number) {
-        for (const collision of this.collisions) {
-            if (collision.bodyA.isStatic) {
-                collision.bodyB.move(collision.penetration.normal.multiply(collision.penetration.depth));
-            } else if (collision.bodyB.isStatic) {
-                collision.bodyA.move(collision.penetration.normal.multiply(collision.penetration.depth).negate());
+        for (const manifold of this.manifolds) {
+            if (manifold.bodyA.isStatic) {
+                manifold.bodyB.move(manifold.penetration.normal.multiply(manifold.penetration.depth));
+            } else if (manifold.bodyB.isStatic) {
+                manifold.bodyA.move(manifold.penetration.normal.multiply(manifold.penetration.depth).negate());
             } else {
-                collision.bodyA.move(collision.penetration.normal.multiply(collision.penetration.depth / 2.0).negate());
-                collision.bodyB.move(collision.penetration.normal.multiply(collision.penetration.depth / 2.0));
+                manifold.bodyA.move(manifold.penetration.normal.multiply(manifold.penetration.depth / 2.0).negate());
+                manifold.bodyB.move(manifold.penetration.normal.multiply(manifold.penetration.depth / 2.0));
             }
 
-            this.resolveCollision(collision);
+            this.resolveCollision(manifold);
         }
 
         // this.tempBody.applyForce(this.tempForce.multiply(elapsedTime * this.tempBody.mass * 10));
@@ -202,20 +225,20 @@ export class World {
         }
     }
 
-    private resolveCollision(collision: CollisionData) {
-        const bodyA = collision.bodyA;
-        const bodyB = collision.bodyB;
+    private resolveCollision(manifold: Manifold) {
+        const bodyA = manifold.bodyA;
+        const bodyB = manifold.bodyB;
 
         const relativeVelocity = bodyB.linearVelocity.subtract(bodyA.linearVelocity);
 
-        if (relativeVelocity.dot(collision.penetration.normal) > 0) {
+        if (relativeVelocity.dot(manifold.penetration.normal) > 0) {
             return;
         }
 
         const e = Math.min(bodyA.restitution, bodyB.restitution);
-        const j = -(1.0 + e) * relativeVelocity.dot(collision.penetration.normal) / (bodyA.invMass + bodyB.invMass);
+        const j = -(1.0 + e) * relativeVelocity.dot(manifold.penetration.normal) / (bodyA.invMass + bodyB.invMass);
 
-        const impulse = collision.penetration.normal.multiply(j);
+        const impulse = manifold.penetration.normal.multiply(j);
 
         // bodyA.applyForce(impulse.negate());
         // bodyB.applyForce(impulse);
@@ -240,7 +263,8 @@ export class World {
                     body.position.y,
                     body.radius,
                     0,
-                    Math.PI * 2, true
+                    Math.PI * 2,
+                    true
                 )
                 this.context.stroke();
             } else {
@@ -257,11 +281,36 @@ export class World {
             // const aabb = body.aabb;
             // this.context.strokeRect(aabb.min.x, aabb.min.y, aabb.max.x - aabb.min.x, aabb.max.y - aabb.min.y);
         });
+
+        this.manifolds.forEach(manifold => {
+            this.context.beginPath();
+            this.context.arc(
+                manifold.contactPoints[0].x,
+                manifold.contactPoints[0].y,
+                3,
+                0,
+                Math.PI * 2,
+                true
+            );
+            this.context.stroke();
+            if (manifold.contactPoints.length > 1) {
+                this.context.beginPath();
+                this.context.arc(
+                    manifold.contactPoints[1].x,
+                    manifold.contactPoints[1].y,
+                    3,
+                    0,
+                    Math.PI * 2,
+                    true
+                );
+                this.context.stroke();
+            }
+        })
     }
 
     clear() {
         this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this.collisions = [];
+        this.manifolds = [];
 
         for (let i = 0; i < this.bodies.length; i++) {
             if (this.bodies[i].aabb.max.y < 0) {

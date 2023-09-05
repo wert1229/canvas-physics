@@ -1,5 +1,5 @@
 import {Epsilon} from "../epsilon.js";
-import {Transform} from "./transform";
+import {Transform} from "./transform.js";
 
 export class Vector {
     constructor(public x: number, public y: number) {}
@@ -82,5 +82,9 @@ export class Vector {
             transform.cos * this.x - transform.sin * this.y + transform.x,
             transform.sin * this.x + transform.cos * this.y + transform.y
         );
+    }
+
+    nealyEquals(other: Vector): boolean {
+        return Math.abs(this.x - other.x) < Epsilon.E && Math.abs(this.y - other.y) < Epsilon.E;
     }
 }

@@ -36,19 +36,19 @@ export class Gjk implements CollisionDetector {
         return f1.subtract(f2);
     }
 
-    private furthestPoint(shape: Vector[], d: Vector): Vector {
-        let max = Number.NEGATIVE_INFINITY;
-        let index = 0;
-
-        for (let i = 0; i < shape.length; i++) {
-            const dot = shape[i].dot(d);
-            if (dot > max) {
-                max = dot;
-                index = i;
-            }
-        }
-        return shape[index];
-    }
+    // private furthestPoint(shape: Vector[], d: Vector): Vector {
+    //     let max = Number.NEGATIVE_INFINITY;
+    //     let index = 0;
+    //
+    //     for (let i = 0; i < shape.length; i++) {
+    //         const dot = shape[i].dot(d);
+    //         if (dot > max) {
+    //             max = dot;
+    //             index = i;
+    //         }
+    //     }
+    //     return shape[index];
+    // }
 
     private checkSimplex(simplex: Vector[], direction: Vector): boolean {
         if (simplex.length == 2) {
