@@ -5,11 +5,13 @@ import {Aabb} from "../geometry/aabb.js";
 export class Body {
     static DEFAULT_DENSITY: number = 1.0;
     static DEFAULT_RESTITUTION: number = 0.5;
+    static DEFAULT_STATIC_FRICTION: number = 0.6;
+    static DEFAULT_DYNAMIC_FRICTION: number = 0.4;
 
     position: Vector;
     linearVelocity: Vector;
     private rotation: number;
-    private angularVelocity: number;
+    angularVelocity: number;
 
     private force: Vector;
 
@@ -18,6 +20,8 @@ export class Body {
     invMass: number;
     inertia: number;
     invInertia: number;
+    staticFriction: number;
+    dynamicFriction: number;
 
     private area: number;
     restitution: number;
@@ -43,6 +47,8 @@ export class Body {
                         invMass: number,
                         inertia: number,
                         invInertia: number,
+                        staticFriction: number,
+                        dynamicFriction: number,
                         area: number,
                         restitution: number,
                         isStatic: boolean,
@@ -61,6 +67,8 @@ export class Body {
         this.invMass = invMass;
         this.inertia = inertia;
         this.invInertia = invInertia;
+        this.staticFriction = staticFriction;
+        this.dynamicFriction = dynamicFriction;
         this.area = area;
         this.restitution = restitution;
         this.isStatic = isStatic;
@@ -91,6 +99,8 @@ export class Body {
             isStatic ? 0 : 1.0 / mass,
             inertia,
             isStatic ? 0 : 1.0 / inertia,
+            Body.DEFAULT_STATIC_FRICTION,
+            Body.DEFAULT_DYNAMIC_FRICTION,
             area,
             Body.DEFAULT_RESTITUTION,
             isStatic,
@@ -127,6 +137,8 @@ export class Body {
             isStatic ? 0 : 1.0 / mass,
             inertia,
             isStatic ? 0 : 1.0 / inertia,
+            Body.DEFAULT_STATIC_FRICTION,
+            Body.DEFAULT_DYNAMIC_FRICTION,
             area,
             Body.DEFAULT_RESTITUTION,
             isStatic,
@@ -179,29 +191,16 @@ export class Body {
         }
     }
 
-    applyForce(force: Vector): void {
-        this.force = this.force.add(force);
-    }
-
-    integrateVelocity(elapsedTime: number): void {
+    step(elapsedTime: number, gravity: Vector): void {
         if (this.isStatic) {
             return;
         }
 
-        const acceleration = this.force.multiply(this.invMass);
-        this.linearVelocity = this.linearVelocity.add(acceleration.multiply(elapsedTime));
-        // this.angularVelocity += this.torque * elapsedTime / this.mass;
-
-        this.force = Vector.zero();
-    }
-
-    integratePosition(elapsedTime: number): void {
-        if (this.isStatic) {
-            return;
-        }
-
+        this.linearVelocity = this.linearVelocity.add(gravity.multiply(elapsedTime));
         this.position = this.position.add(this.linearVelocity.multiply(elapsedTime));
         this.rotation = this.rotation + this.angularVelocity * elapsedTime;
+
+        this.force = Vector.zero();
         this.transformVertices();
         this.aabb = this.getAabb();
     }

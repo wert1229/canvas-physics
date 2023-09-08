@@ -5,6 +5,28 @@ import {Epsilon} from "../epsilon.js";
 
 export class Gjk implements CollisionDetector {
     detect(bodyA: Body, bodyB: Body): CollisionData {
+        // for (let i = 0; i < this.bodies.length - 1; i++) {
+        //     for (let j = i + 1; j < this.bodies.length; j++) {
+        //         const bodyA = this.bodies[i];
+        //         const bodyB = this.bodies[j];
+        //
+        //         const distance = Vector.distance(bodyA.position, bodyB.position);
+        //
+        //         if (distance > bodyA.radius + bodyB.radius) {
+        //             continue;
+        //         }
+        //
+        //         this.collisions.push(
+        //             new Collision(
+        //                 bodyA,
+        //                 bodyB,
+        //                 bodyB.position.subtract(bodyA.position).norm(),
+        //                 bodyA.radius + bodyB.radius - distance
+        //             )
+        //         );
+        //     }
+        // }
+
         const direction = new Vector(1, 0);
 
         const simplex: Vector[] = [];

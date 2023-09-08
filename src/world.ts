@@ -1,8 +1,9 @@
 import {Vector} from "./geometry/vector.js";
 import {Body} from "./physics/body.js";
 import {Gjk} from "./collision/gjk.js";
-import {CollisionDetector, ContactPointSolver, Manifold} from "./collision/collision.js";
+import {CollisionData, CollisionDetector, ContactPointSolver, Manifold} from "./collision/collision.js";
 import {PointLineSegmentSolver} from "./collision/pointlinesegmentsovler.js";
+import {Epsilon} from "./epsilon.js";
 
 export class World {
     private canvas: HTMLCanvasElement;
@@ -20,7 +21,7 @@ export class World {
     private manifolds: Manifold[];
     private contactPointSolver: ContactPointSolver;
 
-    private stepMs: number = 1000 / 60;
+    private stepMs: number = 0;
 
     constructor(canvasElementId: string) {
         this.canvas = document.getElementById(canvasElementId) as HTMLCanvasElement;
@@ -38,41 +39,6 @@ export class World {
     }
 
     initSampleData() {
-        // const circles: Body[] = [...new Array(10)]
-        //     .map(() => {
-        //         return Body.createCircle(
-        //             new Vector(
-        //                 Math.floor(Math.random() * this.canvas.width - 50) + 50,
-        //                 Math.floor(Math.random() * this.canvas.height - 50) + 50,
-        //             ),
-        //             Math.floor(Math.random() * 30) + 20,
-        //             false
-        //         );
-        //     });
-        //
-        // this.addAll(circles);
-        //
-        // const boxes: Body[] = [...new Array(10)]
-        //     .map(() => {
-        //         return Body.createBox(
-        //             new Vector(
-        //                 Math.floor(Math.random() * this.canvas.width - 50) + 50,
-        //                 Math.floor(Math.random() * this.canvas.height - 50) + 50,
-        //             ),
-        //             Math.floor(Math.random() * 30) + 20,
-        //             Math.floor(Math.random() * 30) + 20,
-        //             true
-        //         );
-        //     });
-        //
-        // this.addAll(boxes);
-        //
-        // this.tempBody = this.bodies[0];
-        //
-        // this.canvas.addEventListener("mousemove", e => {
-        //     this.tempForce = new Vector(e.offsetX, e.offsetY).subtract(this.tempBody.position);
-        // });
-
         const earth = Body.createBox(
             new Vector(this.canvas.width / 2, 25),
             this.canvas.width,
@@ -107,9 +73,6 @@ export class World {
         }
     }
 
-    tempForce: Vector = Vector.zero();
-    tempBody: Body;
-
     add(body: Body): void {
         this.bodies.push(body);
     }
@@ -138,9 +101,10 @@ export class World {
     }
 
     step(elapsedTime: number, iteration: number) {
-        this.clear();
         const before = Date.now()
         for (let i = 0; i < iteration; i++) {
+            this.clear();
+            this.stepBodies(elapsedTime / iteration);
             this.detect();
             this.solve(elapsedTime / iteration);
         }
@@ -149,29 +113,17 @@ export class World {
         this.draw();
     }
 
-    detect() {
-        // for (let i = 0; i < this.bodies.length - 1; i++) {
-        //     for (let j = i + 1; j < this.bodies.length; j++) {
-        //         const bodyA = this.bodies[i];
-        //         const bodyB = this.bodies[j];
-        //
-        //         const distance = Vector.distance(bodyA.position, bodyB.position);
-        //
-        //         if (distance > bodyA.radius + bodyB.radius) {
-        //             continue;
-        //         }
-        //
-        //         this.collisions.push(
-        //             new Collision(
-        //                 bodyA,
-        //                 bodyB,
-        //                 bodyB.position.subtract(bodyA.position).norm(),
-        //                 bodyA.radius + bodyB.radius - distance
-        //             )
-        //         );
-        //     }
-        // }
+    stepBodies(elapsedTime: number) {
+        for (const body of this.bodies) {
+            body.step(elapsedTime, this.gravity);
+        }
+    }
 
+    broadPhase() {
+
+    }
+
+    detect() {
         for (let i = 0; i < this.bodies.length - 1; i++) {
             for (let j = i + 1; j < this.bodies.length; j++) {
                 const bodyA = this.bodies[i];
@@ -185,6 +137,8 @@ export class World {
                 if (!collision) {
                     continue;
                 }
+
+                this.separate(collision);
 
                 const contactPoints = this.contactPointSolver.findContactPoints(
                     collision.bodyA,
@@ -202,49 +156,87 @@ export class World {
         }
     }
 
-    solve(elapsedTime: number) {
-        for (const manifold of this.manifolds) {
-            if (manifold.bodyA.isStatic) {
-                manifold.bodyB.move(manifold.penetration.normal.multiply(manifold.penetration.depth));
-            } else if (manifold.bodyB.isStatic) {
-                manifold.bodyA.move(manifold.penetration.normal.multiply(manifold.penetration.depth).negate());
-            } else {
-                manifold.bodyA.move(manifold.penetration.normal.multiply(manifold.penetration.depth / 2.0).negate());
-                manifold.bodyB.move(manifold.penetration.normal.multiply(manifold.penetration.depth / 2.0));
-            }
-
-            this.resolveCollision(manifold);
-        }
-
-        // this.tempBody.applyForce(this.tempForce.multiply(elapsedTime * this.tempBody.mass * 10));
-
-        for (const body of this.bodies) {
-            body.applyForce(this.gravity.multiply(body.mass));
-            body.integrateVelocity(elapsedTime);
-            body.integratePosition(elapsedTime);
+    separate(collision: CollisionData) {
+        if (collision.bodyA.isStatic) {
+            collision.bodyB.move(collision.penetration.normal.multiply(collision.penetration.depth));
+        } else if (collision.bodyB.isStatic) {
+            collision.bodyA.move(collision.penetration.normal.multiply(collision.penetration.depth).negate());
+        } else {
+            collision.bodyA.move(collision.penetration.normal.multiply(collision.penetration.depth / 2.0).negate());
+            collision.bodyB.move(collision.penetration.normal.multiply(collision.penetration.depth / 2.0));
         }
     }
 
-    private resolveCollision(manifold: Manifold) {
+    solve(elapsedTime: number) {
+        for (const manifold of this.manifolds) {
+            this.resolveCollision2(manifold);
+        }
+    }
+
+    private resolveCollision2(manifold: Manifold) {
         const bodyA = manifold.bodyA;
         const bodyB = manifold.bodyB;
 
-        const relativeVelocity = bodyB.linearVelocity.subtract(bodyA.linearVelocity);
+        const staticFriction = (bodyA.staticFriction + bodyB.staticFriction) * 0.5;
+        const dynamicFriction = (bodyA.dynamicFriction + bodyB.dynamicFriction) * 0.5;
 
-        if (relativeVelocity.dot(manifold.penetration.normal) > 0) {
-            return;
+        for (const contactPoint of manifold.contactPoints) {
+            const ra = contactPoint.subtract(bodyA.position);
+            const rb = contactPoint.subtract(bodyB.position);
+
+            const raPerp = ra.perpendicular();
+            const rbPerp = rb.perpendicular();
+
+            const angularLinearVelocityA = raPerp.multiply(bodyA.angularVelocity);
+            const angularLinearVelocityB = rbPerp.multiply(bodyB.angularVelocity);
+
+            const relativeVelocity = bodyB.linearVelocity.add(angularLinearVelocityB)
+                .subtract(bodyA.linearVelocity.add(angularLinearVelocityA));
+
+            const contactVelocityMag = relativeVelocity.dot(manifold.penetration.normal);
+
+            if (contactVelocityMag > 0) {
+                continue;
+            }
+
+            const raPerpDotN = raPerp.dot(manifold.penetration.normal);
+            const rbPerpDotN = rbPerp.dot(manifold.penetration.normal);
+
+            const denom = bodyA.invMass + bodyB.invMass
+                + (raPerpDotN * raPerpDotN) * bodyA.invInertia
+                + (rbPerpDotN * rbPerpDotN) * bodyB.invInertia;
+            const j = -(1.0 + Math.min(bodyA.restitution, bodyB.restitution)) * contactVelocityMag
+                / (denom * manifold.contactPoints.length);
+
+            const impulse = manifold.penetration.normal.multiply(j);
+
+            bodyA.linearVelocity = bodyA.linearVelocity.add(impulse.negate().multiply(bodyA.invMass));
+            bodyA.angularVelocity += -ra.cross(impulse) * bodyA.invInertia;
+            bodyB.linearVelocity = bodyB.linearVelocity.add(impulse.multiply(bodyB.invMass));
+            bodyB.angularVelocity += rb.cross(impulse) * bodyB.invInertia;
+
+            let tangent = relativeVelocity.subtract(manifold.penetration.normal.multiply(relativeVelocity.dot(manifold.penetration.normal)));
+
+            if (tangent.magnitude() < Epsilon.E) {
+                continue;
+            } else {
+                tangent = tangent.normalize();
+            }
+
+            const raPerpDotT = raPerp.dot(tangent);
+            const rbPerpDotT = rbPerp.dot(tangent);
+
+            const jt = relativeVelocity.dot(tangent.negate()) / (denom * manifold.contactPoints.length);
+
+            const frictionImpulse = Math.abs(jt) < j * staticFriction
+                ? tangent.multiply(jt)
+                : tangent.multiply(-j * dynamicFriction);
+
+            bodyA.linearVelocity = bodyA.linearVelocity.add(frictionImpulse.negate().multiply(bodyA.invMass));
+            bodyA.angularVelocity += -ra.cross(frictionImpulse) * bodyA.invInertia;
+            bodyB.linearVelocity = bodyB.linearVelocity.add(frictionImpulse.multiply(bodyB.invMass));
+            bodyB.angularVelocity += rb.cross(frictionImpulse) * bodyB.invInertia;
         }
-
-        const e = Math.min(bodyA.restitution, bodyB.restitution);
-        const j = -(1.0 + e) * relativeVelocity.dot(manifold.penetration.normal) / (bodyA.invMass + bodyB.invMass);
-
-        const impulse = manifold.penetration.normal.multiply(j);
-
-        // bodyA.applyForce(impulse.negate());
-        // bodyB.applyForce(impulse);
-
-        bodyA.linearVelocity = bodyA.linearVelocity.subtract(impulse.multiply(bodyA.invMass));
-        bodyB.linearVelocity = bodyB.linearVelocity.add(impulse.multiply(bodyB.invMass));
     }
 
     draw() {

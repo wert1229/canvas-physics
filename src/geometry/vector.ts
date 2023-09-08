@@ -77,6 +77,10 @@ export class Vector {
         return new Vector(this.x * invMagnitude, this.y * invMagnitude);
     }
 
+    perpendicular(): Vector {
+        return new Vector(-this.y, this.x);
+    }
+
     transform(transform: Transform) {
         return new Vector(
             transform.cos * this.x - transform.sin * this.y + transform.x,
